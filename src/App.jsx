@@ -10,6 +10,7 @@ const C = {
   border: "#252D40", danger: "#F75F5F",
 };
 
+// ── STORAGE HELPERS ──────────────────────────────────────────────
 const LS = {
   get: (k, fallback = null) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -122,14 +123,19 @@ const ProgressRing = ({ progress, size=56, stroke=4, color=C.accent, children })
 };
 
 export default function ArnieApp() {
+  // ── STATE (all hydrated from localStorage) ───────────────────
   const [screen, setScreen] = useState("home");
   const [program, setProgram] = useState(() => LS.get("arnie_program"));
   const [userName, setUserName] = useState(() => LS.get("arnie_username", ""));
   const [programBuilt, setProgramBuilt] = useState(() => LS.get("arnie_program_built", false));
   const [chatMessages, setChatMessages] = useState(() => LS.get("arnie_chat", [ONBOARDING_OPENER]));
+
+  // weightLog: { exId: [ { date, sets: [{reps, weight}] } ] }
   const [weightLog, setWeightLog] = useState(() => LS.get("arnie_weightlog", {}));
+
   const [activeSession, setActiveSession] = useState(null);
   const [completedSets, setCompletedSets] = useState({});
+  // setWeights: { "exId-setIdx": { reps: string, weight: string } }
   const [setWeights, setSetWeights] = useState({});
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
@@ -137,11 +143,12 @@ export default function ArnieApp() {
   const [expandedEx, setExpandedEx] = useState(null);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const [historyModal, setHistoryModal] = useState(null);
+  const [historyModal, setHistoryModal] = useState(null); // exId
 
   const chatEndRef = useRef(null);
   const timerRef = useRef(null);
 
+  // ── PERSIST TO LOCALSTORAGE ──────────────────────────────────
   useEffect(() => { LS.set("arnie_program", program); }, [program]);
   useEffect(() => { LS.set("arnie_username", userName); }, [userName]);
   useEffect(() => { LS.set("arnie_program_built", programBuilt); }, [programBuilt]);
@@ -191,7 +198,8 @@ export default function ArnieApp() {
   const getLastWeight = (exId) => {
     const log = weightLog[exId];
     if (!log || !log.length) return null;
-    return log[log.length-1];
+    const last = log[log.length-1];
+    return last;
   };
 
   const toggleSet = (exId, setIdx) => {
@@ -203,6 +211,7 @@ export default function ArnieApp() {
     });
   };
 
+  // Save weight log when session ends (when navigating away or all sets done)
   const saveSessionWeights = () => {
     if (!activeSession) return;
     const today = new Date().toLocaleDateString("en-AU", { day:"numeric", month:"short", year:"numeric" });
@@ -259,6 +268,7 @@ export default function ArnieApp() {
     setChatLoading(false);
   };
 
+  // ── NAV ──────────────────────────────────────────────────────
   const NavBar = () => {
     const tabs = [
       { id:"home", label:"Home", icon:(a)=>(
@@ -318,6 +328,7 @@ export default function ArnieApp() {
     </div>
   );
 
+  // ── HISTORY MODAL ────────────────────────────────────────────
   const HistoryModal = ({ exId, exName, onClose }) => {
     const log = weightLog[exId] || [];
     return (
@@ -353,7 +364,7 @@ export default function ArnieApp() {
     );
   };
 
-  // HOME
+  // ── HOME ─────────────────────────────────────────────────────
   if (screen === "home") {
     if (!program) return (
       <div style={{ maxWidth:430, margin:"0 auto", minHeight:"100vh", background:C.midnight, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:32, paddingBottom:100 }}>
@@ -414,7 +425,7 @@ export default function ArnieApp() {
     );
   }
 
-  // SESSION
+  // ── SESSION ──────────────────────────────────────────────────
   if (screen === "session") {
     const prog = sessionProgress();
     const done = prog === 100;
@@ -431,6 +442,7 @@ export default function ArnieApp() {
               <span style={{ fontSize:11, fontWeight:700, color:done?C.accentSoft:C.accent }}>{prog}%</span>
             </ProgressRing>
           </div>
+          {/* Timer */}
           <div style={{ background:C.navyLift, borderRadius:12, padding:"10px 14px", display:"flex", alignItems:"center", gap:10 }} className={timerRunning?"timer-glow":""}>
             <ProgressRing progress={timerSeconds>0 ? 100-timerPct : 0} size={44} stroke={3} color={timerRunning?C.accent:C.textDim}>
               <span style={{ fontSize:11, fontWeight:700, color:timerRunning?C.accent:C.textDim }}>{formatTime(timerSeconds)}</span>
@@ -465,6 +477,7 @@ export default function ArnieApp() {
             const last = getLastWeight(ex.id);
             return (
               <div key={ex.id} className="fade-in" style={{ background:exDone?C.accentSoftGlow:C.navy, border:`1px solid ${exDone?C.accentSoft:C.border}`, borderRadius:16, marginBottom:12, overflow:"hidden", transition:"all 0.2s" }}>
+                {/* Header */}
                 <div style={{ padding:"14px 16px" }}>
                   <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
                     <div style={{ flex:1 }}>
@@ -475,7 +488,7 @@ export default function ArnieApp() {
                       <div style={{ fontSize:12, color:C.textMid, marginTop:2 }}>{ex.sets} sets × {ex.reps} reps</div>
                       {last && (
                         <div style={{ fontSize:11, color:C.accentSoft, marginTop:3 }}>
-                          Last: {last.sets.map((s,i)=>`${s.weight||"?"}kg×${s.reps||"?"}`).join(" · ")}
+                          Last session: {last.sets.map((s,i)=>`${s.weight||"?"}kg×${s.reps||"?"}`).join(" · ")}
                         </div>
                       )}
                     </div>
@@ -487,6 +500,7 @@ export default function ArnieApp() {
                     </div>
                   </div>
 
+                  {/* Sets with weight input */}
                   <div style={{ marginTop:12, display:"flex", flexDirection:"column", gap:8 }}>
                     {Array.from({length:ex.sets},(_,i)=>{
                       const key = `${ex.id}-${i}`;
@@ -500,18 +514,22 @@ export default function ArnieApp() {
                           </button>
                           <div style={{ display:"flex", gap:6, flex:1, alignItems:"center" }}>
                             <div style={{ position:"relative", flex:1 }}>
-                              <input type="number" inputMode="decimal" placeholder={lastSet?.weight || "kg"}
+                              <input
+                                type="number" inputMode="decimal" placeholder={lastSet?.weight || "kg"}
                                 value={sw.weight}
                                 onChange={e=>setSetWeights(prev=>({...prev,[key]:{...sw,weight:e.target.value}}))}
-                                style={{ width:"100%", background:C.navyLift, border:`1px solid ${checked?C.accentSoft:C.border}`, borderRadius:8, padding:"7px 10px", fontSize:13, color:C.textPrime, outline:"none" }}/>
+                                style={{ width:"100%", background:C.navyLift, border:`1px solid ${checked?C.accentSoft:C.border}`, borderRadius:8, padding:"7px 10px", fontSize:13, color:C.textPrime, outline:"none" }}
+                              />
                               <span style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", fontSize:11, color:C.textDim, pointerEvents:"none" }}>kg</span>
                             </div>
                             <span style={{ fontSize:12, color:C.textDim, flexShrink:0 }}>×</span>
                             <div style={{ position:"relative", flex:1 }}>
-                              <input type="text" placeholder={ex.reps}
+                              <input
+                                type="text" placeholder={ex.reps}
                                 value={sw.reps===ex.reps?"":sw.reps}
                                 onChange={e=>setSetWeights(prev=>({...prev,[key]:{...sw,reps:e.target.value||ex.reps}}))}
-                                style={{ width:"100%", background:C.navyLift, border:`1px solid ${checked?C.accentSoft:C.border}`, borderRadius:8, padding:"7px 10px", fontSize:13, color:C.textPrime, outline:"none" }}/>
+                                style={{ width:"100%", background:C.navyLift, border:`1px solid ${checked?C.accentSoft:C.border}`, borderRadius:8, padding:"7px 10px", fontSize:13, color:C.textPrime, outline:"none" }}
+                              />
                               <span style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", fontSize:11, color:C.textDim, pointerEvents:"none" }}>reps</span>
                             </div>
                           </div>
@@ -548,7 +566,7 @@ export default function ArnieApp() {
     );
   }
 
-  // CHAT
+  // ── CHAT ─────────────────────────────────────────────────────
   if (screen === "chat") return (
     <div style={{ maxWidth:430, margin:"0 auto", height:"100vh", background:C.midnight, display:"flex", flexDirection:"column" }}>
       <div style={{ background:C.navy, borderBottom:`1px solid ${C.border}`, padding:"14px 20px", flexShrink:0 }}>
@@ -591,7 +609,7 @@ export default function ArnieApp() {
     </div>
   );
 
-  // PROGRAM
+  // ── PROGRAM ──────────────────────────────────────────────────
   if (screen === "program") {
     if (!program) return (
       <AppShell title="My Program" subtitle="No program yet">
